@@ -15,10 +15,11 @@ export default function LoginForm({ onSuccess }) {
       const res = await loginUser({ email, password });
       if (res.success && res.token) {
         localStorage.setItem('auth.token', res.token);
+        // console.log("FULL RESPONSE:", res);
         if (res.user) {
           localStorage.setItem('auth.user', JSON.stringify(res.user));
         }
-        try { window.dispatchEvent(new Event('auth:changed')); } catch (_) {}
+        try { window.dispatchEvent(new Event('auth:changed')); } catch (_) { }
         onSuccess?.();
       } else {
         setError(res.error || 'Login failed');
@@ -30,16 +31,18 @@ export default function LoginForm({ onSuccess }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
       {error && <p className="text-rose-600 text-sm">{error}</p>}
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700">Email</label>
-          <input type="email" className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/60 transition" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+          <input type="email" name="random-email"
+            autoComplete="off" className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/60 transition" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700">Password</label>
-          <input type="password" className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/60 transition" value={password} onChange={(e)=>setPassword(e.target.value)} required />
+          <input type="password" name="random-password"
+            autoComplete="new-password" className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/60 transition" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
       </div>
       <div className="space-y-6">

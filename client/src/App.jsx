@@ -1,16 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import GroupDashboardPage from './pages/GroupDashboardPage.jsx';
 import GroupDetailPage from './pages/GroupDetailPage.jsx';
-import { createExpense, createGroup, getGroup, getGroups, updateGroup, getMe } from './api/api.js';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import {
+  createExpense,
+  createGroup,
+  getGroup,
+  getGroups,
+  updateGroup,
+  getMe,
+} from './api/api.js';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage.jsx';
 import JoinPage from './pages/JoinPage.jsx';
 
 function ProtectedApp({ children }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth.token') : null;
+
   if (!token) {
     return <Navigate to="/" replace />;
   }
+
   return children;
 }
 
@@ -27,39 +36,73 @@ export default function App() {
   });
 
   const fetchGroupsList = async () => {
+    const token = localStorage.getItem('auth.token');
+    if (!token) {
+      setGroups([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await getGroups();
       if (data.success) {
-        setGroups(data.data);
+        setGroups(data.data || []);
+      } else {
+        setGroups([]);
       }
     } catch (error) {
       console.error('Failed to fetch groups:', error);
+      setGroups([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const loadCurrentUser = async () => {
+    const token = localStorage.getItem('auth.token');
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
+
+    try {
+      const res = await getMe();
+      if (res.success) {
+        setCurrentUser(res.user);
+        localStorage.setItem('auth.user', JSON.stringify(res.user));
+      }
+    } catch (error) {
+      console.error('Failed to load current user:', error);
+    }
   };
 
   useEffect(() => {
-    fetchGroupsList();
+    const token = localStorage.getItem('auth.token');
+
+    if (token) {
+      fetchGroupsList();
+      loadCurrentUser();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    const loadMe = async () => {
-      try {
-        const res = await getMe();
-        if (res.success) setCurrentUser(res.user);
-      } catch {}
-    };
-    if (!currentUser && typeof window !== 'undefined' && localStorage.getItem('auth.token')) {
-      loadMe();
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
     const onAuthChanged = () => {
-      const u = localStorage.getItem('auth.user');
-      setCurrentUser(u ? JSON.parse(u) : null);
+      const token = localStorage.getItem('auth.token');
+
+      if (token) {
+        fetchGroupsList();
+        loadCurrentUser();
+      } else {
+        setGroups([]);
+        setCurrentUser(null);
+        setSelectedGroupId(null);
+        setLoading(false);
+      }
     };
+
     window.addEventListener('auth:changed', onAuthChanged);
     return () => window.removeEventListener('auth:changed', onAuthChanged);
   }, []);
@@ -81,7 +124,7 @@ export default function App() {
       if (data.success) {
         const groupData = await getGroup(selectedGroupId);
         if (groupData.success) {
-          setGroups(prev => prev.map(g => g._id === selectedGroupId ? groupData.data : g));
+          setGroups(prev => prev.map(g => (g._id === selectedGroupId ? groupData.data : g)));
         }
       }
     } catch (error) {
@@ -89,18 +132,28 @@ export default function App() {
     }
   };
 
-  const selectedGroup = groups.find(g => g._id === selectedGroupId);
-
   const handleEditGroup = async (groupId, payload) => {
     try {
       const updated = await updateGroup(groupId, payload);
       if (updated.success) {
-        setGroups(prev => prev.map(g => g._id === groupId ? updated.data : g));
+        setGroups(prev => prev.map(g => (g._id === groupId ? updated.data : g)));
       }
-    } catch (e) {
-      console.error('Failed to update group:', e);
+    } catch (error) {
+      console.error('Failed to update group:', error);
     }
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth.token');
+    localStorage.removeItem('auth.user');
+    setGroups([]);
+    setCurrentUser(null);
+    setSelectedGroupId(null);
+    window.dispatchEvent(new Event('auth:changed'));
+    window.location.href = '/';
+  };
+
+  const selectedGroup = groups.find(g => g._id === selectedGroupId);
 
   const appShell = (
     <div className="bg-slate-50 min-h-screen font-sans text-slate-900">
@@ -108,10 +161,17 @@ export default function App() {
         {`@keyframes modal-enter { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .animate-modal-enter { animation: modal-enter 0.3s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; }`}
       </style>
+
       <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-10 border-b border-slate-200/80">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex items-center">
-          <svg className="w-8 h-8 text-teal-600 mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1Z"/></svg>
+          <svg className="w-8 h-8 text-teal-600 mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+            <path d="M12 18V6" />
+            <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1Z" />
+          </svg>
+
           <h1 className="text-xl font-bold text-slate-800">Splitter</h1>
+
           <div className="ml-auto flex items-center gap-3">
             {currentUser ? (
               <>
@@ -124,7 +184,12 @@ export default function App() {
                     <div className="text-slate-500 leading-tight">{currentUser.email}</div>
                   </div>
                 </div>
-                <button onClick={() => { localStorage.removeItem('auth.token'); localStorage.removeItem('auth.user'); window.location.href = '/'; }} className="text-sm text-slate-600 hover:text-rose-600 px-2 py-1">Logout</button>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-slate-600 hover:text-rose-600 px-2 py-1"
+                >
+                  Logout
+                </button>
               </>
             ) : (
               <div className="w-8 h-8 rounded-full bg-slate-200 animate-pulse" />
@@ -132,6 +197,7 @@ export default function App() {
           </div>
         </div>
       </header>
+
       <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           {selectedGroup ? (
